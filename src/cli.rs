@@ -100,6 +100,10 @@ pub struct Cli {
     /// Optional key-value pairs to be included in the request.
     #[structopt(name = "REQUEST_ITEM")]
     pub request_items: Vec<RequestItem>,
+
+    /// Skip the host's SSL certificate verification
+    #[structopt(long)]
+    pub verify: bool,
 }
 
 impl Cli {
