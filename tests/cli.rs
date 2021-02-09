@@ -128,8 +128,8 @@ fn multiline_value() {
 
     "#});
 }
-#[test]
-fn https_self_signed_cert_error() -> Result<(), Box<dyn std::error::Error>> {
+
+fn verify_none() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = get_command();
     cmd.arg("-v")
         .arg("--pretty=format")
@@ -162,11 +162,11 @@ fn https_self_signed_cert_error() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn https_self_signed_cert_skip() -> Result<(), Box<dyn std::error::Error>> {
+fn verify_yes() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = get_command();
     cmd.arg("-v")
         .arg("--pretty=format")
-        .arg("--verify=false")
+        .arg("--verify=yes")
         .arg("get")
         .arg("https://self-signed.badssl.com");
 
@@ -191,6 +191,62 @@ fn https_self_signed_cert_skip() -> Result<(), Box<dyn std::error::Error>> {
         0: error trying to connect: invalid certificate: UnknownIssuer
         1: invalid certificate: UnknownIssuer
     "#});
+
+    Ok(())
+}
+
+#[test]
+fn verify_no() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = get_command();
+    cmd.arg("-v")
+        .arg("--pretty=format")
+        .arg("--verify=no")
+        .arg("get")
+        .arg("https://self-signed.badssl.com");
+
+    cmd.assert().stdout(indoc! {r#"
+        GET / HTTP/1.1
+        accept: application/json, */*
+        accept-encoding: gzip, deflate
+        connection: keep-alive
+        content-length: 0
+        content-type: application/json
+        host: self-signed.badssl.com
+        user-agent: ht/0.0.0 (test mode)
+
+
+
+    "#});
+
+    cmd.assert().stderr(predicate::str::is_empty());
+
+    Ok(())
+}
+
+#[test]
+fn verify_a_path() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = get_command();
+    cmd.arg("-v")
+        .arg("--pretty=format")
+        .arg("--verify=ca_bundle")
+        .arg("get")
+        .arg("https://self-signed.badssl.com");
+
+    cmd.assert().stdout(indoc! {r#"
+        GET / HTTP/1.1
+        accept: application/json, */*
+        accept-encoding: gzip, deflate
+        connection: keep-alive
+        content-length: 0
+        content-type: application/json
+        host: self-signed.badssl.com
+        user-agent: ht/0.0.0 (test mode)
+
+
+
+    "#});
+
+    cmd.assert().stderr(predicate::str::is_empty());
 
     Ok(())
 }
