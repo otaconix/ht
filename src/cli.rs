@@ -103,7 +103,7 @@ pub struct Cli {
 
     /// Skip the host's SSL certificate verification
     #[structopt(long)]
-    pub verify: bool,
+    pub verify: Option<VerifyHttps>,
 }
 
 impl Cli {
@@ -377,6 +377,28 @@ impl FromStr for RequestItem {
                 &format!("{:?} is not a valid value", request_item),
                 ErrorKind::InvalidValue,
             ))
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum VerifyHttps {
+    Yes,
+    No,
+    PrivateCerts(String),
+}
+
+impl FromStr for VerifyHttps {
+    type Err = Error;
+    fn from_str(verify: &str) -> Result<VerifyHttps> {
+        match verify.to_lowercase().as_str() {
+            "no" => Ok(VerifyHttps::No),
+            "yes" => Ok(VerifyHttps::Yes),
+            "" => Err(Error::with_description(
+                &format!("{:?} is not a valid value", verify),
+                ErrorKind::InvalidValue,
+            )),
+            _ => Ok(VerifyHttps::PrivateCerts(verify.to_owned())),
         }
     }
 }

@@ -128,3 +128,69 @@ fn multiline_value() {
 
     "#});
 }
+#[test]
+fn https_self_signed_cert_error() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = get_command();
+    cmd.arg("-v")
+        .arg("--pretty=format")
+        .arg("get")
+        .arg("https://self-signed.badssl.com");
+
+    cmd.assert().stdout(indoc! {r#"
+        GET / HTTP/1.1
+        accept: application/json, */*
+        accept-encoding: gzip, deflate
+        connection: keep-alive
+        content-length: 0
+        content-type: application/json
+        host: self-signed.badssl.com
+        user-agent: ht/0.0.0 (test mode)
+
+
+
+    "#});
+
+    cmd.assert().stderr(indoc! {r#"
+    Error: error sending request for url (https://self-signed.badssl.com/): error trying to connect: invalid certificate: UnknownIssuer
+
+    Caused by:
+        0: error trying to connect: invalid certificate: UnknownIssuer
+        1: invalid certificate: UnknownIssuer
+    "#});
+
+    Ok(())
+}
+
+#[test]
+fn https_self_signed_cert_skip() -> Result<(), Box<dyn std::error::Error>> {
+    let mut cmd = get_command();
+    cmd.arg("-v")
+        .arg("--pretty=format")
+        .arg("--verify=false")
+        .arg("get")
+        .arg("https://self-signed.badssl.com");
+
+    cmd.assert().stdout(indoc! {r#"
+        GET / HTTP/1.1
+        accept: application/json, */*
+        accept-encoding: gzip, deflate
+        connection: keep-alive
+        content-length: 0
+        content-type: application/json
+        host: self-signed.badssl.com
+        user-agent: ht/0.0.0 (test mode)
+
+
+
+    "#});
+
+    cmd.assert().stderr(indoc! {r#"
+    Error: error sending request for url (https://self-signed.badssl.com/): error trying to connect: invalid certificate: UnknownIssuer
+
+    Caused by:
+        0: error trying to connect: invalid certificate: UnknownIssuer
+        1: invalid certificate: UnknownIssuer
+    "#});
+
+    Ok(())
+}
