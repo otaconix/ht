@@ -103,7 +103,7 @@ pub struct Cli {
     pub request_items: Vec<RequestItem>,
 
     /// Skip the host's SSL certificate verification, or use an alternative CA bundle.
-    #[structopt(long, default_value)]
+    #[structopt(long, default_value, possible_values = &VerifyHttps::variants())]
     pub verify: VerifyHttps,
 }
 
@@ -417,5 +417,11 @@ impl fmt::Display for VerifyHttps {
             VerifyHttps::Yes => write!(f, "yes"),
             VerifyHttps::PrivateCerts(path) => write!(f, "path: {}", path),
         }
+    }
+}
+
+impl VerifyHttps {
+    fn variants() -> Vec<&'static str> {
+        vec!["no", "false", "yes", "true"]
     }
 }
