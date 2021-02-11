@@ -101,9 +101,9 @@ pub struct Cli {
     #[structopt(name = "REQUEST_ITEM")]
     pub request_items: Vec<RequestItem>,
 
-    /// Skip the host's SSL certificate verification
-    #[structopt(long)]
-    pub verify: Option<VerifyHttps>,
+    /// Skip the host's SSL certificate verification, or use an alternative CA bundle.
+    #[structopt(long, default_value = "yes")]
+    pub verify: VerifyHttps,
 }
 
 impl Cli {
@@ -400,5 +400,11 @@ impl FromStr for VerifyHttps {
             )),
             _ => Ok(VerifyHttps::PrivateCerts(verify.to_owned())),
         }
+    }
+}
+
+impl Default for VerifyHttps {
+    fn default() -> Self {
+        VerifyHttps::Yes
     }
 }

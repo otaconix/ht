@@ -18,7 +18,7 @@ mod utils;
 use anyhow::{anyhow, Result};
 use auth::Auth;
 use buffer::Buffer;
-use cli::{AuthType, Cli, Method, Pretty, Print, RequestItem, Theme};
+use cli::{AuthType, Cli, Method, Pretty, Print, RequestItem, Theme, VerifyHttps};
 use download::{download_file, get_file_size};
 use printer::Printer;
 use request_items::{Body, RequestItems};
@@ -68,8 +68,15 @@ async fn main() -> Result<()> {
         true => Policy::limited(args.max_redirects.unwrap_or(10)),
         false => Policy::none(),
     };
+    let disable_certificate_verification = match args.verify {
+        VerifyHttps::No => true,
+        VerifyHttps::Yes | VerifyHttps::PrivateCerts(_) => false,
+    };
 
-    let client = Client::builder().redirect(redirect).build()?;
+    let client = Client::builder()
+        .redirect(redirect)
+        .danger_accept_invalid_certs(disable_certificate_verification)
+        .build()?;
     let request = {
         let mut request_builder = client
             .request(method, url.0)
