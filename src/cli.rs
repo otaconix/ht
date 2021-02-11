@@ -1,3 +1,4 @@
+use std::fmt;
 use std::str::FromStr;
 
 use regex::Regex;
@@ -102,7 +103,7 @@ pub struct Cli {
     pub request_items: Vec<RequestItem>,
 
     /// Skip the host's SSL certificate verification, or use an alternative CA bundle.
-    #[structopt(long, default_value = "yes")]
+    #[structopt(long, default_value)]
     pub verify: VerifyHttps,
 }
 
@@ -392,8 +393,8 @@ impl FromStr for VerifyHttps {
     type Err = Error;
     fn from_str(verify: &str) -> Result<VerifyHttps> {
         match verify.to_lowercase().as_str() {
-            "no" => Ok(VerifyHttps::No),
-            "yes" => Ok(VerifyHttps::Yes),
+            "no" | "false" => Ok(VerifyHttps::No),
+            "yes" | "true" => Ok(VerifyHttps::Yes),
             "" => Err(Error::with_description(
                 &format!("{:?} is not a valid value", verify),
                 ErrorKind::InvalidValue,
@@ -406,5 +407,15 @@ impl FromStr for VerifyHttps {
 impl Default for VerifyHttps {
     fn default() -> Self {
         VerifyHttps::Yes
+    }
+}
+
+impl fmt::Display for VerifyHttps {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VerifyHttps::No => write!(f, "no"),
+            VerifyHttps::Yes => write!(f, "yes"),
+            VerifyHttps::PrivateCerts(path) => write!(f, "path: {}", path),
+        }
     }
 }
