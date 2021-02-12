@@ -23,6 +23,8 @@ use download::{download_file, get_file_size};
 use printer::Printer;
 use request_items::{Body, RequestItems};
 use reqwest::redirect::Policy;
+use std::io::Read;
+use std::fs::File;
 use url::Url;
 use utils::body_from_stdin;
 
@@ -72,11 +74,34 @@ async fn main() -> Result<()> {
         VerifyHttps::No => true,
         VerifyHttps::Yes | VerifyHttps::PrivateCerts(_) => false,
     };
+    let tls_custom_cas: Vec<pem::Pem> = match args.verify {
+        VerifyHttps::PrivateCerts(bundle_file) => {
+            let mut f = File::open(bundle_file)?;
+            let mut buffer = Vec::new();
+            f.read_to_end(&mut buffer)?;
+            pem::parse_many(buffer)
+        }
+        _ => Vec::new(),
+    };
 
-    let client = Client::builder()
+    let mut client = Client::builder()
         .redirect(redirect)
-        .danger_accept_invalid_certs(disable_certificate_verification)
-        .build()?;
+        /*
+        TODO: uncomment whenever Reqwest releases the next version, which should contain this function
+        See: https://github.com/seanmonstar/reqwest/pull/1150
+        */
+        /*
+        .tls_built_in_root_certs(match args.verify {
+            VerifyHttps::PrivateCerts(_) => false,
+            _ => true,
+        })
+        */
+        .danger_accept_invalid_certs(disable_certificate_verification);
+    for tls_custom_ca in tls_custom_cas {
+        let certificate = reqwest::Certificate::from_pem(pem::encode(&tls_custom_ca).as_bytes())?;
+        client = client.add_root_certificate(certificate);
+    }
+    let client = client.build()?;
     let request = {
         let mut request_builder = client
             .request(method, url.0)
