@@ -1,4 +1,6 @@
 use std::fmt;
+use std::fs::File;
+use std::io::Read;
 use std::str::FromStr;
 
 use regex::Regex;
@@ -106,6 +108,14 @@ pub struct Cli {
     /// bundle. Disable = "no" or "false", enable = "yes" or "true".
     #[structopt(long, default_value)]
     pub verify: VerifyHttps,
+
+    /// Use a client side certificate for the SSL communication.
+    #[structopt(long)]
+    pub cert: Option<String>,
+
+    /// Pass the path of the private key file if the private key is not contained in the cert file.
+    #[structopt(long = "cert-key")]
+    pub cert_key: Option<String>,
 }
 
 impl Cli {
@@ -383,11 +393,11 @@ impl FromStr for RequestItem {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq)]
 pub enum VerifyHttps {
     Yes,
     No,
-    PrivateCerts(String),
+    PrivateCerts(String, Vec<pem::Pem>),
 }
 
 impl FromStr for VerifyHttps {
@@ -400,7 +410,13 @@ impl FromStr for VerifyHttps {
                 &format!("{:?} is not a valid value", verify),
                 ErrorKind::InvalidValue,
             )),
-            _ => Ok(VerifyHttps::PrivateCerts(verify.to_owned())),
+            path => {
+                let mut file = File::open(path)?;
+                let mut buffer = Vec::new();
+                file.read_to_end(&mut buffer)?;
+                let pems = pem::parse_many(buffer);
+                Ok(VerifyHttps::PrivateCerts(path.to_owned(), pems))
+            }
         }
     }
 }
@@ -416,7 +432,7 @@ impl fmt::Display for VerifyHttps {
         match self {
             VerifyHttps::No => write!(f, "no"),
             VerifyHttps::Yes => write!(f, "yes"),
-            VerifyHttps::PrivateCerts(path) => write!(f, "path: {}", path),
+            VerifyHttps::PrivateCerts(path, _pems) => write!(f, "path: {}", path),
         }
     }
 }
