@@ -70,30 +70,35 @@ async fn main() -> Result<()> {
         true => Policy::limited(args.max_redirects.unwrap_or(10)),
         false => Policy::none(),
     };
-    let disable_certificate_verification = match args.verify {
+    let disable_certificate_verification = match args.ssl.verify {
         VerifyHttps::No => true,
-        VerifyHttps::Yes | VerifyHttps::PrivateCerts(_, _) => false,
+        VerifyHttps::Yes | VerifyHttps::PrivateCerts(_) => false,
     };
-    let tls_custom_cas: Vec<pem::Pem> = match args.verify {
-        VerifyHttps::PrivateCerts(_, pem) => pem,
-        VerifyHttps::No | VerifyHttps::Yes => vec![],
+    let tls_custom_cas: Vec<pem::Pem> = match args.ssl.verify {
+        VerifyHttps::PrivateCerts(bundle_file) => {
+            let mut f = File::open(bundle_file)?;
+            let mut buffer = Vec::new();
+            f.read_to_end(&mut buffer)?;
+            pem::parse_many(buffer)
+        }
+        _ => Vec::new(),
     };
-    let tls_client_identity = match args.cert {
+    let tls_client_identity = match args.ssl.cert {
         Some(cert) => {
             let mut f = File::open(cert)?;
             let mut buffer = Vec::new();
             f.read_to_end(&mut buffer)?;
-            match args.cert_key {
+            match args.ssl.cert_key {
                 Some(cert_key) => {
                     buffer.push(0x0Au8);
                     let mut f = File::open(cert_key)?;
                     f.read_to_end(&mut buffer)?;
                 }
-                _ => (),
+                _ => ()
             }
 
             Some(reqwest::Identity::from_pem(&buffer)?)
-        }
+        },
         _ => None,
     };
 
