@@ -1,6 +1,4 @@
 use std::fmt;
-use std::fs::File;
-use std::io::Read;
 use std::str::FromStr;
 
 use regex::Regex;
@@ -104,17 +102,25 @@ pub struct Cli {
     #[structopt(name = "REQUEST_ITEM")]
     pub request_items: Vec<RequestItem>,
 
+    #[structopt(flatten)]
+    pub ssl: SslArguments,
+}
+
+#[derive(StructOpt, Debug)]
+pub struct SslArguments {
     /// Skip the host's SSL certificate verification, or use an alternative CA
     /// bundle. Disable = "no" or "false", enable = "yes" or "true".
     #[structopt(long, default_value)]
     pub verify: VerifyHttps,
 
-    /// Use a client side certificate for the SSL communication.
+    /// Certificate to use for client verification. If the file does not contain a private key,
+    /// specify one using the --cert-key flag.
     #[structopt(long)]
     pub cert: Option<String>,
 
-    /// Pass the path of the private key file if the private key is not contained in the cert file.
-    #[structopt(long = "cert-key")]
+    /// Private key to use with the certificate specified by the --cert flag. Only necessary if
+    /// that file does not contain the private key.
+    #[structopt(long = "cert-key", requires = "cert")]
     pub cert_key: Option<String>,
 }
 
@@ -393,11 +399,11 @@ impl FromStr for RequestItem {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum VerifyHttps {
     Yes,
     No,
-    PrivateCerts(String, Vec<pem::Pem>),
+    PrivateCerts(String),
 }
 
 impl FromStr for VerifyHttps {
@@ -410,13 +416,7 @@ impl FromStr for VerifyHttps {
                 &format!("{:?} is not a valid value", verify),
                 ErrorKind::InvalidValue,
             )),
-            path => {
-                let mut file = File::open(path)?;
-                let mut buffer = Vec::new();
-                file.read_to_end(&mut buffer)?;
-                let pems = pem::parse_many(buffer);
-                Ok(VerifyHttps::PrivateCerts(path.to_owned(), pems))
-            }
+            _ => Ok(VerifyHttps::PrivateCerts(verify.to_owned())),
         }
     }
 }
@@ -432,7 +432,7 @@ impl fmt::Display for VerifyHttps {
         match self {
             VerifyHttps::No => write!(f, "no"),
             VerifyHttps::Yes => write!(f, "yes"),
-            VerifyHttps::PrivateCerts(path, _pems) => write!(f, "path: {}", path),
+            VerifyHttps::PrivateCerts(path) => write!(f, "path: {}", path),
         }
     }
 }
