@@ -438,6 +438,7 @@ dependencies = [
  "indoc",
  "jsonxf",
  "lazy_static",
+ "pem",
  "predicates",
  "regex",
  "reqwest",
@@ -817,6 +818,17 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "winapi",
+]
+
+[[package]]
+name = "pem"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4c220d01f863d13d96ca82359d1e81e64a7c6bf0637bcde7b2349630addf0c6"
+dependencies = [
+ "base64",
+ "once_cell",
+ "regex",
 ]
 
 [[package]]

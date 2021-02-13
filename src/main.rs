@@ -23,6 +23,8 @@ use download::{download_file, get_file_size};
 use printer::Printer;
 use request_items::{Body, RequestItems};
 use reqwest::redirect::Policy;
+use std::fs::File;
+use std::io::Read;
 use url::Url;
 use utils::body_from_stdin;
 
@@ -68,15 +70,62 @@ async fn main() -> Result<()> {
         true => Policy::limited(args.max_redirects.unwrap_or(10)),
         false => Policy::none(),
     };
-    let disable_certificate_verification = match args.verify {
+    let disable_certificate_verification = match args.ssl.verify {
         VerifyHttps::No => true,
         VerifyHttps::Yes | VerifyHttps::PrivateCerts(_) => false,
     };
+    let tls_custom_cas: Vec<pem::Pem> = match args.ssl.verify {
+        VerifyHttps::PrivateCerts(bundle_file) => {
+            let mut f = File::open(bundle_file)?;
+            let mut buffer = Vec::new();
+            f.read_to_end(&mut buffer)?;
+            pem::parse_many(buffer)
+        }
+        _ => Vec::new(),
+    };
+    let tls_client_identity = match args.ssl.cert {
+        Some(cert) => {
+            let mut f = File::open(cert)?;
+            let mut buffer = Vec::new();
+            f.read_to_end(&mut buffer)?;
+            match args.ssl.cert_key {
+                Some(cert_key) => {
+                    buffer.push(0x0Au8);
+                    let mut f = File::open(cert_key)?;
+                    f.read_to_end(&mut buffer)?;
+                }
+                _ => ()
+            }
 
-    let client = Client::builder()
+            Some(reqwest::Identity::from_pem(&buffer)?)
+        },
+        _ => None,
+    };
+
+    let mut client = Client::builder()
         .redirect(redirect)
-        .danger_accept_invalid_certs(disable_certificate_verification)
-        .build()?;
+        /*
+        TODO: uncomment whenever Reqwest releases the next version, which should contain this function
+        See: https://github.com/seanmonstar/reqwest/pull/1150
+        */
+        /*
+        .tls_built_in_root_certs(match args.ssl.verify {
+            VerifyHttps::PrivateCerts(_) => false,
+            _ => true,
+        })
+        */
+        .danger_accept_invalid_certs(disable_certificate_verification);
+    for tls_custom_ca in tls_custom_cas {
+        let certificate = reqwest::Certificate::from_pem(pem::encode(&tls_custom_ca).as_bytes())?;
+        client = client.add_root_certificate(certificate);
+    }
+
+    client = match tls_client_identity {
+        Some(identity) => client.identity(identity),
+        _ => client,
+    };
+
+    let client = client.build()?;
     let request = {
         let mut request_builder = client
             .request(method, url.0)
