@@ -11,7 +11,7 @@ repository = "https://github.com/ducaale/ht"
 readme = "README.md"
 
 [dependencies]
-ansi_term = "0.12"
+crossterm = "0.19.0"
 anyhow = "1.0.38"
 assert_matches = "1.4.0"
 atty = "0.2"

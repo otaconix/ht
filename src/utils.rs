@@ -1,10 +1,9 @@
 use std::io::{self, Write};
 use std::path::Path;
 
-use ansi_term::Color::{self, Fixed, RGB};
-use ansi_term::{self, Style};
 use anyhow::{anyhow, Result};
 use atty::Stream;
+use crossterm::style::{style, Color, Attribute};
 use reqwest::{
     header::{HeaderMap, CONTENT_TYPE},
     multipart,
@@ -114,15 +113,15 @@ pub fn colorize<'a>(
 
     for line in LinesWithEndings::from(text) {
         let highlights = h.highlight(line, &PS);
-        for (style, component) in highlights {
-            let mut color = Style {
-                foreground: to_ansi_color(style.foreground),
-                ..Style::default()
-            };
-            if style.font_style.contains(FontStyle::UNDERLINE) {
-                color = color.underline();
+        for (syntect_style, component) in highlights {
+            let mut colored_component = style(component).with(Color::Reset);
+            if let Some(color) = to_colored_color(syntect_style.foreground) {
+                colored_component = colored_component.with(color);
             }
-            write!(out, "{}", color.paint(component))?;
+            if syntect_style.font_style.contains(FontStyle::UNDERLINE) {
+                colored_component = colored_component.attribute(Attribute::Underlined);
+            }
+            write!(out, "{}", colored_component)?;
         }
     }
     write!(out, "\x1b[0m")?;
@@ -130,7 +129,7 @@ pub fn colorize<'a>(
 }
 
 // https://github.com/sharkdp/bat/blob/3a85fd767bd1f03debd0a60ac5bc08548f95bc9d/src/terminal.rs
-fn to_ansi_color(color: syntect::highlighting::Color) -> Option<ansi_term::Color> {
+fn to_colored_color(color: syntect::highlighting::Color) -> Option<Color> {
     if color.a == 0 {
         // Themes can specify one of the user-configurable terminal colors by
         // encoding them as #RRGGBBAA with AA set to 00 (transparent) and RR set
@@ -146,7 +145,7 @@ fn to_ansi_color(color: syntect::highlighting::Color) -> Option<ansi_term::Color
             0x02 => Some(Color::Green),
             0x03 => Some(Color::Yellow),
             0x04 => Some(Color::Blue),
-            0x05 => Some(Color::Purple),
+            0x05 => Some(Color::Magenta),
             0x06 => Some(Color::Cyan),
             // The 8th color is white. Themes use it as the default foreground
             // color, but that looks wrong on terminals with a light background.
@@ -160,10 +159,14 @@ fn to_ansi_color(color: syntect::highlighting::Color) -> Option<ansi_term::Color
             // TODO: When ansi_term adds support for bright variants using codes
             // 90-97 (foreground) and 100-107 (background), we should use those
             // for values 0x08 to 0x0f and only use Fixed for 0x10 to 0xff.
-            n => Some(Fixed(n)),
+            n => Some(Color::AnsiValue(n)),
         }
     } else {
-        Some(RGB(color.r, color.g, color.b))
+        Some(Color::Rgb {
+            r: color.r,
+            g: color.g,
+            b: color.b,
+        })
     }
 }
 
